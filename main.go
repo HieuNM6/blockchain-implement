@@ -7,7 +7,11 @@ import (
 )
 
 func main() {
-	bc := NewBlockchain()
+	bc, err := NewBlockchain()
+	if err != nil {
+		log.Fatalf("Failed to create or open blochain by error: %v \n", err)
+	}
+
 	defer func() {
 		if err := bc.db.Close(); err != nil {
 			log.Println(err)

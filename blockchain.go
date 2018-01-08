@@ -14,7 +14,7 @@ type Blockchain struct {
 	db  *bolt.DB
 }
 
-func (bc *Blockchain) AddBlock(data string) {
+func (bc *Blockchain) AddBlock(data string) error {
 	var lastHash []byte
 
 	err := bc.db.View(func(tx *bolt.Tx) error {
@@ -24,45 +24,45 @@ func (bc *Blockchain) AddBlock(data string) {
 		return nil
 	})
 	if err != nil {
-		log.Panic(err)
+		return err
 	}
 
 	newBlock := NewBlock(data, lastHash)
 
 	err = bc.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
-		err := b.Put(newBlock.Hash, newBlock.Serialize())
+		buf, err := newBlock.Serialize()
 		if err != nil {
-			log.Panic(err)
+			return err
 		}
 
-		err = b.Put([]byte("l"), newBlock.Serialize())
+		err = b.Put(newBlock.Hash, buf)
 		if err != nil {
-			log.Panic(err)
+			return err
+		}
+
+		err = b.Put([]byte("l"), newBlock.Hash)
+		if err != nil {
+			return err
 		}
 
 		bc.tip = newBlock.Hash
-		err = b.Put([]byte("l"), newBlock.Hash)
-		if err != nil {
-			log.Panic(err)
-		}
 
 		return nil
 	})
-	if err != nil {
-		log.Panic(err)
-	}
+
+	return err
 }
 
 func NewGenesisBlock() *Block {
 	return NewBlock("Genesis Block", []byte{})
 }
 
-func NewBlockchain() *Blockchain {
+func NewBlockchain() (*Blockchain, error) {
 	var tip []byte
 	db, err := bolt.Open(dbFile, 0600, nil)
 	if err != nil {
-		log.Panic(err)
+		return nil, err
 	}
 
 	err = db.Update(func(tx *bolt.Tx) error {
@@ -71,27 +71,30 @@ func NewBlockchain() *Blockchain {
 			genesis := NewGenesisBlock()
 			b, err = tx.CreateBucket([]byte(blocksBucket))
 			if err != nil {
-				log.Panic(err)
+				return err
 			}
 
-			err = b.Put(genesis.Hash, genesis.Serialize())
+			buf, err := genesis.Serialize()
 			if err != nil {
-				log.Panic(err)
+				return err
+			}
+
+			err = b.Put(genesis.Hash, buf)
+			if err != nil {
 			}
 
 			err = b.Put([]byte("l"), genesis.Hash)
 			if err != nil {
 				log.Panic(err)
 			}
-
-		} else {
-			tip = b.Get([]byte("l"))
 		}
+
+		tip = b.Get([]byte("l"))
 
 		return nil
 	})
 
-	return &Blockchain{tip, db}
+	return &Blockchain{tip, db}, err
 }
 
 func (bc *Blockchain) Iterator() *BlockchainIterator {

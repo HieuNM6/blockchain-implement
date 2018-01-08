@@ -50,7 +50,12 @@ func (cli *CLI) Run() {
 }
 
 func (cli *CLI) addBlock(data string) {
-	cli.bc.AddBlock(data)
+	err := cli.bc.AddBlock(data)
+	if err != nil {
+		fmt.Printf("Failed to add New Block by error: %v \n", err)
+		return
+	}
+
 	fmt.Println("Success!")
 }
 
